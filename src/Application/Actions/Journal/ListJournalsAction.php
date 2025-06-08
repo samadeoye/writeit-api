@@ -73,8 +73,6 @@ class ListJournalsAction
 
             return Functions::getJsonResponse($response, [
                 'status' => 'success',
-                'page' => $page,
-                'limit' => $limit,
                 'totalCount' => $totalCount,
                 'data' => $journals
             ]);
