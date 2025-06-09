@@ -66,7 +66,8 @@ class JournalAction
             ]);
 
             $id = $this->pdo->lastInsertId();
-            if (is_int($id))
+            $id = (int)$id;
+            if ($id > 0)
             {
                 $newEntry = $this->getJournalEntry(
                     $id, $deviceId, $apiFields
