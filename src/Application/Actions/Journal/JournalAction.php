@@ -66,12 +66,20 @@ class JournalAction
             ]);
 
             $id = $this->pdo->lastInsertId();
-
-            $stmt = $this->pdo->prepare("SELECT $apiFields FROM journals WHERE id = :id");
-            $stmt->execute([':id' => $id]);
-            $newEntry = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            return Functions::getJsonResponse($response, $newEntry, 201);
+            if (is_int($id))
+            {
+                $newEntry = $this->getJournalEntry(
+                    $id, $deviceId, $apiFields
+                );
+                return Functions::getJsonResponse($response, $newEntry, 201);
+            }
+            else
+            {
+                return Functions::getJsonResponse($response, [
+                    'status' => 'error',
+                    'message' => 'Entry could not be added. Please try again.'
+                ], 500);
+            }
 
         } catch (PDOException $e) {
             return Functions::getJsonResponse($response, [
@@ -115,9 +123,10 @@ class JournalAction
 
         try {
             // Check if journal exists and belongs to this deviceId
-            $stmt = $this->pdo->prepare("SELECT id FROM $this->table WHERE id = :id AND device_id = :deviceId");
-            $stmt->execute([':id' => $id, ':deviceId' => $deviceId]);
-            if (!$stmt->fetch()) {
+            $entryExists = $this->getJournalEntry(
+                $id, $deviceId, 'id'
+            );
+            if (!$entryExists) {
                 return Functions::getJsonResponse($response, [
                     'status' => 'error',
                     'message' => 'Journal not found for this device'
@@ -140,9 +149,9 @@ class JournalAction
 
             // Fetch updated journal
             $apiFields = JournalFunctions::getApiJournalFields();
-            $stmt = $this->pdo->prepare("SELECT $apiFields FROM $this->table WHERE id = :id");
-            $stmt->execute([':id' => $id]);
-            $newEntry = $stmt->fetch(PDO::FETCH_ASSOC);
+            $newEntry = $this->getJournalEntry(
+                $id, $deviceId, $apiFields
+            );
 
             return Functions::getJsonResponse($response, $newEntry, 200);
 
@@ -176,14 +185,10 @@ class JournalAction
 
         try {
             // Check if the journal entry exists and belongs to the device
-            $stmt = $this->pdo->prepare("
-                SELECT id 
-                FROM $this->table 
-                WHERE id = :id AND device_id = :deviceId AND deleted = 0
-            ");
-            $stmt->execute([':id' => $id, ':deviceId' => $deviceId]);
-            $exists = $stmt->fetch();
-            if (!$exists) {
+            $entryExists = $this->getJournalEntry(
+                $id, $deviceId, 'id'
+            );
+            if (!$entryExists) {
                 return Functions::getJsonResponse($response, [
                     'status' => 'error',
                     'message' => 'Journal not found or already deleted'
@@ -213,5 +218,27 @@ class JournalAction
                 'message' => 'Database error: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Get journal entry by id and device id
+     * @param int $id
+     * @param string $deviceId
+     * @param string $fields
+
+     * @return array
+     */
+    public function getJournalEntry(int $id, string $deviceId, string $fields='*')
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT $fields 
+            FROM $this->table 
+            WHERE id = :id AND device_id = :deviceId AND deleted = 0
+        ");
+        $stmt->execute([
+            ':id' => $id
+            , ':deviceId' => $deviceId
+        ]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 }
